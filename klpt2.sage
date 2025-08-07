@@ -3,7 +3,7 @@ from random import randint
 
 load('sspecppas.sage')
 
-def KLPT2(g1,g2,L=2,target_e0=100,verbose=True):
+def KLPT2(g1,g2,L=2,target_e0=100,verbose=True,step_by_step=False):
     while True:
         min_e2 = 0
         if verbose:
@@ -17,25 +17,33 @@ def KLPT2(g1,g2,L=2,target_e0=100,verbose=True):
         ā,c̄ = ct(a), ct(c)
         if verbose:
             print("1A. Completed get_acś.")
+            print(f"a = {a}")
+            print(f"c = {c}")
             print(f"s' = {ś}")
             if not ś.is_prime(): print("Warning: s' is not prime")
             print("\n1B. Starting get_bde0.")
+        if step_by_step: breakpoint()
         b,d,e0 = get_bde0(a,c,L,target_e0,verbose)
         u1 = Matrix(B,2,2,[a,b,c,d])
         ūgu = ct(u1)*g1*u1
         if verbose:
             print("1B. Completed get_bde0.")
+            print(f"b = {b}")
+            print(f"d = {d}")
             print(f"e0 = {e0}")
             print("\n1C. Starting get_αǵ.")
+        if step_by_step: breakpoint()
         α1, ǵ1 = get_αǵ(ūgu, L, verbose)
         ŕ = ǵ1[0][1]
         rn_ŕ = ZZ(rn(ŕ))
         if verbose:
             print("1C. Completed get_αǵ.")
+            print(f"α = {α1}")
         rn_ǵ1 = ZZ(rn(ǵ1))
         assert rn_ǵ1.is_prime_power(), f"[Error] KLPT2: 𝒩(g1') = {rn_ǵ1} is not a prime power."
         if verbose:
             print(f"𝒩(g1') = {factor(rn_ǵ1)}")
+        if step_by_step: breakpoint()
         
         while True:
             if verbose:
@@ -47,8 +55,11 @@ def KLPT2(g1,g2,L=2,target_e0=100,verbose=True):
             min_e2 = e2 + 1
             if verbose:
                 print("1D. Completed get_áće2.")
+                print(f"a' = {á}")
+                print(f"c' = {ć}")
                 print(f"e2 = {e2}")
                 print("\n1E. Starting get_bde0.")
+            if step_by_step: breakpoint()
             for trial_e0 in range(e0-4, e0+12):
                 b́,d́,e0_1 = get_bde0(á,ć,L,trial_e0,verbose)
                 if verbose:
@@ -68,8 +79,11 @@ def KLPT2(g1,g2,L=2,target_e0=100,verbose=True):
                 continue
             if verbose:
                 print("1E. Completed get_bde0.")
+                print(f"b' = {b́}")
+                print(f"d' = {d́}")
                 print(f"e0' = {e0_1}")
                 print(f"\ne1 = {e1_1}")
+            if step_by_step: breakpoint()
 
             (s,r),(r̄,t) = g2
             assert ct(r) == r̄, f"[Error] KLPT2: g2 is not Hermitian."
@@ -78,8 +92,11 @@ def KLPT2(g1,g2,L=2,target_e0=100,verbose=True):
             a,c,ś = get_acś(g2, L, verbose)
             if verbose:
                 print("2A. Completed get_acś.")
+                print(f"a = {a}")
+                print(f"c = {c}")
                 print(f"s' = {ś}")
                 print("\n2B. Starting get_bde0.")
+            if step_by_step: breakpoint()
             for trial_e0 in range(e0-4, e0+12):
                 b,d,e0_2 = get_bde0(a,c,L,trial_e0,verbose)
                 if verbose:
@@ -93,24 +110,32 @@ def KLPT2(g1,g2,L=2,target_e0=100,verbose=True):
                 continue
             if verbose:
                 print("2B. Completed get_bde0.")
+                print(f"b = {b}")
+                print(f"d = {d}")
                 print(f"e0 = {e0_2}")
                 print("\n2C. Starting get_αǵ.")
+            if step_by_step: breakpoint()
             α2, ǵ2 = get_αǵ(ūgu, L, verbose)
             ŕ = ǵ2[0][1]
             rn_ŕ = ZZ(rn(ŕ))
             if verbose:
                 print("2C. Completed get_αǵ.")
+                print(f"α = {α2}")
             rn_ǵ2 = ZZ(rn(ǵ2))
             assert rn_ǵ2.is_prime_power(), f"[Error] KLPT2: 𝒩(g2') = {rn_ǵ2} is not a prime power."
             if verbose:
                 print(f"𝒩(g2') = {factor(rn_ǵ2)}")
                 print("\n2D. Starting get_áće2.")
+            if step_by_step: breakpoint()
             á,ć,e2 = get_áće2(ǵ2, L, e2, 0, verbose)
             if e2 == None: continue
             if verbose:
                 print("2D. Completed get_áće2.")
+                print(f"a' = {á}")
+                print(f"c' = {ć}")
                 print(f"e2 = {e2}")
                 print("\n2E. Starting get_bde0.")
+            if step_by_step: breakpoint()
             for trial_e0 in range(e0-4, e0+12):
                 b́,d́,e0_2 = get_bde0(á,ć,L,trial_e0,verbose)
                 if verbose:
@@ -130,8 +155,11 @@ def KLPT2(g1,g2,L=2,target_e0=100,verbose=True):
                 continue
             if verbose:
                 print("2E. Completed get_bde0.")
+                print(f"b' = {b́}")
+                print(f"d' = {d́}")
                 print(f"e0' = {e0_2}")
                 print(f"e1' = {e1_2}")
+            if step_by_step: breakpoint()
                 
             h1 = ct(U1) * g1 * U1
             h2 = ct(U2) * g2 * U2
@@ -189,7 +217,7 @@ def get_acś(g, L=2, verbose=True):
     min_ś_prime = Infinity
     min_ś_comp = Infinity
     count = 0
-    terminate_threshold = 10^4
+    terminate_threshold = 10^5
     m = 0
     while True:
         m += 1
@@ -211,7 +239,7 @@ def get_acś(g, L=2, verbose=True):
                     min_c_comp = c
             if (min_ś_prime == 3 and L != 3) or (min_ś_prime == 5 and L == 3) or (min_ś_prime < Infinity and count > terminate_threshold):
                 return min_a_prime, min_c_prime, min_ś_prime
-            if count > terminate_threshold and min_ś_comp < Infinity:
+            if count > terminate_threshold*1.1 and min_ś_comp < Infinity and min_ś_prime == Infinity:
                 return min_a_comp, min_c_comp, min_ś_comp
     raise Exception("[Error] get_acś: Can't find a suitable s'.")
 
@@ -262,29 +290,29 @@ def get_αǵ(g, L=2, verbose=True):
     t́ = ZZ(rn(α)*s+tr(ct(α)*r)+t)
     return α, Matrix(B,2,2,[s,ŕ,ct(ŕ),t́])
 
-def get_áće2(g, L=2, fixed_e2=None, min_e2=0, verbose=True):
-    (s,r),(r̄,t) = g
-    s,t = ZZ(s), ZZ(t)
-    assert s.is_prime(), f"[Error] get_áće2: Top left entry {s} is not prime."
-    K = GF(s)
-    e_bound = ZZ(rn(g)).log(L).n().floor()
-    e2_range = range(min_e2, e_bound) if fixed_e2 == None else [fixed_e2]
-    for e2 in e2_range:
-        for c2 in K:
-            c1_square = K(L^e2) / K(ZZ(t*p*rn(r))) - c2^2
-            if c1_square.is_square():
-                c1 = sqrt(c1_square)
-                c = ZZ(c1) * ct(r) * jj + ZZ(c2) * ct(r) * kk
-                le_tnc = ZZ(L^e2 - t * rn(c))
-                if le_tnc < 0: continue
-                na, rem = ZZ(le_tnc).quo_rem(s)
-                if rem != 0: continue
-                try:
-                    a1,a2 = two_squares(na)
-                    return a1+a2*ii, c, e2
-                except: continue
-    if verbose: print("[Error] get_áće2: Unable to find a' and c' in the allowed range of e2.")
-    return None, None, None
+# def get_áće2(g, L=2, fixed_e2=None, min_e2=0, verbose=True):
+#     (s,r),(r̄,t) = g
+#     s,t = ZZ(s), ZZ(t)
+#     assert s.is_prime(), f"[Error] get_áće2: Top left entry {s} is not prime."
+#     K = GF(s)
+#     e_bound = ZZ(rn(g)).log(L).n().floor()
+#     e2_range = range(min_e2, e_bound) if fixed_e2 == None else [fixed_e2]
+#     for e2 in e2_range:
+#         for c2 in K:
+#             c1_square = K(L^e2) / K(ZZ(t*p*rn(r))) - c2^2
+#             if c1_square.is_square():
+#                 c1 = sqrt(c1_square)
+#                 c = ZZ(c1) * ct(r) * jj + ZZ(c2) * ct(r) * kk
+#                 le_tnc = ZZ(L^e2 - t * rn(c))
+#                 if le_tnc < 0: continue
+#                 na, rem = ZZ(le_tnc).quo_rem(s)
+#                 if rem != 0: continue
+#                 try:
+#                     a1,a2 = two_squares(na)
+#                     return a1+a2*ii, c, e2
+#                 except: continue
+#     if verbose: print("[Error] get_áće2: Unable to find a' and c' in the allowed range of e2.")
+#     return None, None, None
 
 def get_áće2(g, L=2, fixed_e2=None, min_e2=0, verbose=True):
     (s,r),(r̄,t) = g
@@ -330,4 +358,6 @@ def get_áće2(g, L=2, fixed_e2=None, min_e2=0, verbose=True):
 def example():
     g1 = random_polarisation_matrix()
     g2 = random_polarisation_matrix()
+    print(g1)
+    print(g2)
     γ,e = KLPT2(g1,g2,2,100) # Change the value of L and target_norm as required

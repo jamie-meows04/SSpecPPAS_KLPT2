@@ -126,8 +126,8 @@ class SSpecPPAS:
         g = self.poly^((p-1)/2)
         return all([g[p*i-j]==0 for i in range(1,3) for j in range(1,3)])
     
-    def mumford_to_quad_split(self, D):
-        cr = self.lc().nth_root(3)
+    def mumford_to_quad_split(self, D, scale=True):
+        cr = self.lc().nth_root(3) if scale else 1
         quad_split = [cr*D[i][0] for i in range(3)]
         assert product(quad_split) == self.poly
         return quad_split
@@ -193,16 +193,41 @@ class SSpecPPAS:
         kernel = KernelData(str(indices), kernel[:2], kernel)
         return kernel, semi_quad_split
     
-    def kernel_to_isogeny(self, indices, compute_maps=False):
+    def kernel_22_to_codomain(self, kernel, isogeny=False):
+        kernel = [P for P in kernel if P != self.infinity]
         if not self.is_jacobian:
-            kernel, image_is_jacobian, π = self.get_kernel(indices,True)
+            image_is_jacobian = not any(not R.P for R in kernel)
+            if image_is_jacobian:
+                isomorphisms = self.E1.isomorphisms(self.E2)
+                for α in isomorphisms:
+                    if all(α(R[0])==R[1] for R in kernel):
+                        image_is_jacobian = False
+                        break
             if not image_is_jacobian:
-                isogeny = EE_Point.isogeny_EE(kernel.gens)
-                φ = SSpecPPAS_Isogeny(kernel, self, SSpecPPAS(isogeny.codomain), isogeny if compute_maps else None)
+                K1 = [R.P for R in kernel if not R.Q]
+                K2 = [R.Q for R in kernel if not R.P]
+                if K1 and K2:
+                    R1 = K1[0]
+                    R2 = K2[0]
+                    φ1 = R1.curve().isogeny(R1)
+                    φ2 = R2.curve().isogeny(R2)
+                    φ = SSpecPPAS_Isogeny(kernel, self, SSpecPPAS([φ1.codomain(), φ2.codomain()]), lambda R : EE_Point(φ1(R.P), φ2(R.Q)))
+                else:
+                    if not isogeny: return SSpecPPAS_Isogeny(kernel, self, self, None)
+                    G1 = self.E1.gens()
+                    G2 = self.E2.gens()
+                    ker_coefficients = [R.P.log(G1)+R.Q.log(G2) for R in kernel] # 3×4
+                    def φ(R):
+                        coefficients = R.P.log(G1)+R.Q.log(G2)
+                        set_coefficients = [[coefficients[i] - K[i] for i in range(4)] for K in ker_coefficients]
+                        representative = min(set_coefficients, key = lambda C : sum(c^2 for c in C))
+                        image = EE_Point(sum(G1[i]*representative[i] for i in range(2)), sum(G2[i]*representative[2+i] for i in range(2)))
+                        return image
+                    return SSpecPPAS_Isogeny(kernel, self, self, φ)
             else:
                 _.<x> = self.field[]
-                α = [self.torsion1[i][0] for i in range(4)]
-                β = [self.torsion2[π[i]][0] for i in range(4)]
+                α = [0] + [R.P[0] for R in kernel]
+                β = [0] + [R.Q[0] for R in kernel]
                 a1 = (α[3]-α[2])^2/(β[3]-β[2]) + (α[2]-α[1])^2/(β[2]-β[1]) + (α[1]-α[3])^2/(β[1]-β[3])
                 b1 = (β[3]-β[2])^2/(α[3]-α[2]) + (β[2]-β[1])^2/(α[2]-α[1]) + (β[1]-β[3])^2/(α[1]-α[3])
                 a2 = α[1]*(β[3]-β[2]) + α[2]*(β[1]-β[3]) + α[3]*(β[2]-β[1])
@@ -213,19 +238,15 @@ class SSpecPPAS:
                 g2 = A*(α[3]-α[2])*(α[2]-α[1])*x^2 + B*(β[3]-β[2])*(β[2]-β[1])
                 g3 = -(A*(α[1]-α[3])*(α[3]-α[2])*x^2 + B*(β[1]-β[3])*(β[3]-β[2]))
                 J = SSpecPPAS(g1*g2*g3)
-                if compute_maps:
-                    gens = J.get_jacobian_generators()
+                if isogeny:
                     G1 = self.E1.gens()
                     G2 = self.E2.gens()
-                    ker_coefficients = [kernel[i].P.log(self.E1.gens())+kernel[i].Q.log(self.E2.gens()) for i in range(4)]
+                    ker_coefficients = [R.P.log(G1)+R.Q.log(G2) for R in kernel]
                     def φ(R):
-                        J_ = J
-                        coefficients = R.P.log(self.E1.gens())+R.Q.log(self.E2.gens())
-                        set_coefficients = [[coefficients[i]-K[i] for i in range(4)] for K in ker_coefficients]
-                        sizes = [sum(c^2 for c in C) for C in set_coefficients]
-                        min_size = min(sizes)
-                        index = sizes.index(min_size)
-                        representative = set_coefficients[index]
+                        gens = J.get_jacobian_generators()
+                        coefficients = R.P.log(G1)+R.Q.log(G2)
+                        set_coefficients = [[coefficients[i] - K[i] for i in range(4)] for K in ker_coefficients]
+                        representative = min(set_coefficients, key = lambda C : sum(c^2 for c in C))
                         divisor = sum(gens[i]*representative[i] for i in range(4))
                         return divisor
                     φ = SSpecPPAS_Isogeny(kernel, self, J, φ)
@@ -233,7 +254,7 @@ class SSpecPPAS:
             return φ
         
         _.<x> = self.field_ext[]
-        kernel, (f0_,f1_,f2_) = self.get_kernel(indices,True)
+        f0_,f1_,f2_ = self.mumford_to_quad_split(kernel, False)
         first_try = True
         while True:
             if first_try:
@@ -291,7 +312,7 @@ class SSpecPPAS:
                     u = image_extended[0].change_ring(self.field)
                     v = image_extended[1].change_ring(self.field)
                     return J1(u,v)
-                return SSpecPPAS_Isogeny(kernel, self, SSpecPPAS(J1), φ if compute_maps else None)
+                return SSpecPPAS_Isogeny(kernel, self, SSpecPPAS(J1), φ if isogeny else None)
             D = (f0[1]+x*f1[1])^2-4*(f0[0]+x*f1[0])*(f0[2]+x*f1[2])
             λ1,λ2 = D.roots(multiplicities=False)
             U2,V2 = f0+λ1*f1, f0+λ2*f1
@@ -338,7 +359,7 @@ class SSpecPPAS:
                 image_ext = image1 + image2
                 image = EE_Point(image_ext.P.change_ring(self.field), image_ext.Q.change_ring(self.field))
                 return image
-            return SSpecPPAS_Isogeny(kernel, self, codomain, φ if compute_maps else None)
+            return SSpecPPAS_Isogeny(kernel, self, codomain, φ if isogeny else None)
     
     # Returns the supports of the divisor, over the splitting field if extension is True, otherwise over the base field
     def divisor_to_supports(self, divisor, extension=True):
@@ -470,7 +491,8 @@ class EE_Point:
         return all(g1.weil_pairing(g2, N) == 1 for g1,g2 in itertools.combinations(gens, r=int(2)))
 
     def isogeny_EE(P, Q = None):
-        if hasattr(P,'__iter__') and len(P)==2:
+        if type(P) in [list, tuple]:
+            assert len(P) == 2, "The kernel must be specified by 2 generators."
             P,Q = P[0], P[1]
         E1 = P.P.curve()
         E2 = P.Q.curve()
@@ -515,7 +537,8 @@ class KernelData:
         self.gens = gens
         self.points = points if points != None else EE_Point.span(gens)
         self.id = id if id != None else ExE.id_of_2_torsion_points(self.points)
-        self.is_isotropic = EE_Point.is_isotropic(gens, max(R.order() for R in gens))
+        try: self.is_isotropic = EE_Point.is_isotropic(gens, max(R.order() for R in gens))
+        except: pass
 
     def __repr__(self):
         return self.id.__repr__()
@@ -535,22 +558,23 @@ class KernelData:
     def __eq__(self, other):
         return set(self.points) == set(other.points)
 
-def walk(vertex, root, point):
-    surfaces = [root]
-    isogenies = []
-    points = [point]
-    while len(surfaces) <= len(vertex):
-        φ = surfaces[-1].kernel_to_isogeny(vertex[len(surfaces)-1],True)
-        point = φ.map(point)
-        surfaces.append(φ.codomain)
-        isogenies.append(φ.map)
-        points.append(point)
-    return surfaces, isogenies, points
-
-def neighbours(A, print_types=True, compute_maps=False):
-    isogenies = [A.kernel_to_isogeny(i,compute_maps) for i in range(15)]
-    if print_types: print([φ.codomain.type for φ in isogenies])
-    return isogenies
+# Defunct
+# def walk(vertex, root, point):
+#     surfaces = [root]
+#     isogenies = []
+#     points = [point]
+#     while len(surfaces) <= len(vertex):
+#         φ = surfaces[-1].kernel_to_isogeny(vertex[len(surfaces)-1],True)
+#         point = φ.map(point)
+#         surfaces.append(φ.codomain)
+#         isogenies.append(φ.map)
+#         points.append(point)
+#     return surfaces, isogenies, points
+# 
+# def neighbours(A, print_types=True, isogeny=False):
+#     isogenies = [A.kernel_to_isogeny(i,isogeny) for i in range(15)]
+#     if print_types: print([φ.codomain.type for φ in isogenies])
+#     return isogenies
 
 def neighbours_polarisations(g, check_pm=False, pretty_print=False):
     output = [pm(γ,g) for γ in matrices]
@@ -568,9 +592,8 @@ def neighbours_polarisations(g, check_pm=False, pretty_print=False):
 def iota(P):
     E = P.curve()
     if P == E(0): return P
-    z = P.base_ring().gen()
     (x,y) = P.xy()
-    return E([-x,z*y])
+    return P.curve()([-x,ω*y])
     
 def frob(P): return P.curve().frobenius_isogeny()(P)
 
@@ -584,15 +607,19 @@ def evaluate_endomorphism(alpha,P):
     coeff = alpha.coefficient_tuple()
     d = alpha.denominator()
     Qlist = P.division_points(d)
+    if not Qlist:
+        FF = E.base_ring().extension(2,'ζ')
+        P = P.change_ring(FF)
+        Qlist = P.division_points(d)
     retlist = []
     for Q in Qlist:
         Q1 = d * coeff[0] * Q
         Q2 = d * coeff[1] * iota(Q)
         Q3 = d * coeff[2] * frob(Q)
         Q4 = d * coeff[3] * iota(frob(Q))
-        retlist.append(Q1 + Q2 + Q3 + Q4)
+        retlist.append(E(Q1 + Q2 + Q3 + Q4))
     retset = set(retlist)
-    if len(retset) != 1: print(f"Warning: {len(retset)} possible outputs for ({alpha})({P})")
+    if len(retset) != 1: print(f"Warning: {len(retset)} possible outputs for ({alpha})({E(P)})")
     return retlist[0]
 
 def evaluate_matrix_on_point(M, X):
@@ -951,15 +978,19 @@ def load_matrices(single=True):
         if not single: all_matrices.append(find_kernel_matrices(i, single=False))
     return matrices if single else (matrices, all_matrices)
 
-def ExE_torsion(n,full=False):
-    X,Y = E.torsion_basis(n)
-    X1 = EE_Point(X,E(0))
-    X2 = EE_Point(E(0),X)
-    X3 = EE_Point(Y,E(0))
-    X4 = EE_Point(E(0),Y)
-    basis = [X1,X2,X3,X4]
+def ExE_torsion(n,full=False): return elliptic_product_torsion(ExE,n,full)
+
+def elliptic_product_torsion(A : SSpecPPAS, n, full=False):
+    assert not A.is_jacobian, "This function is only implemented for elliptic products."
+    X1,Y1 = A.E1.torsion_basis(n)
+    X2,Y2 = A.E2.torsion_basis(n)
+    Z1 = EE_Point(X1,A.E2(0))
+    Z2 = EE_Point(A.E1(0),X2)
+    Z3 = EE_Point(Y1,A.E2(0))
+    Z4 = EE_Point(A.E1(0),Y2)
+    basis = [Z1,Z2,Z3,Z4]
     if not full: return basis
-    else: return basis, [α1*X1+α2*X2+α3*X3+α4*X4 for α1,α2,α3,α4 in itertools.product(range(n),repeat=4)]
+    else: return basis, [α1*Z1+α2*Z2+α3*Z3+α4*Z4 for α1,α2,α3,α4 in itertools.product(range(n),repeat=4)]
 
 def get_all_ExE_kernels(l=2): # precomputed data, includes non-isotropic kernels
     kernels = None
@@ -1254,27 +1285,58 @@ def kernel_gens(α, n): # α is an isogeny matrix
                 return pts
 
 def make_linearly_independent(gens): # gens is a spanning set of an isogeny kernel
+    A = SSpecPPAS([gens[0].P.curve(), gens[0].Q.curve()])
     gens.sort(key = lambda R : -R.order())
+    ker_size = gens[0].order()^2
     output = []
-    inf = {ExE.infinity}
-    span = {ExE.infinity}
+    inf = {A.infinity}
+    span = {A.infinity}
     for R_ in gens:
         for S in list(inf) + list(span):
             R = R_ + S
             spanR = EE_Point.span(R) - inf
-            if spanR.isdisjoint(span):
+            if spanR and spanR.isdisjoint(span):
                 output.append(R)
                 span |= {S+T for S in spanR for T in span}
                 break
-        else:
-            print("An error occured, falling back to naïve method")
-            kernel = EE_Point.span(gens)
-            ker_size = len(kernel)
-            for rank in range(2,5):
-                for pts in itertools.combinations(kernel, r=rank):
-                    if len(EE_Point.span(pts)) == ker_size and prod(R.order() for R in pts) == ker_size:
-                        return pts
-    return output
+        if prod(R.order() for R in output) == ker_size: break
+        # else:
+        #     print("An error occured, falling back to naïve method")
+        #     kernel = EE_Point.span(gens)
+        #     ker_size = len(kernel)
+        #     for rank in range(2,5):
+        #         for pts in itertools.combinations(kernel, r=rank):
+        #             if len(EE_Point.span(pts)) == ker_size and prod(R.order() for R in pts) == ker_size:
+        #                 return pts
+    return sorted(output, key = lambda x : -x.order())
+
+def BTB2_matrices():
+    matrices = []
+    for A in itertools.combinations(range(4), r=2):
+        M = diagonal_matrix([2 if i in A else 1 for i in range(4)])
+        B = [[] if i in A else [a for a in range(i) if a in A] for i in range(4)]
+        C = [list(itertools.chain.from_iterable(list(itertools.combinations(B[i],r)) for r in range(len(B[i])+1))) for i in range(4)]
+        for D in itertools.product(*C):
+            M_ = Matrix(M)
+            for i in range(4):
+                for d in D[i]:
+                    M_[d,i] = 1
+            M_.set_immutable()
+            matrices.append(M_)
+    return matrices
+
+def apply_BT_matrix(gens, mat, linearly_independent = True):
+    output = []
+    if type(mat) in [list, tuple]:
+        if len(mat) == 0: return gens
+        else: mat = prod([Es[i] for i in mat])
+    for i in range(4):
+        terms = [gens[j]*mat[j,i] for j in range(4)]
+        image = terms[0] + terms[1] + terms[2] + terms[3]
+        if image != ExE.infinity:
+            output.append(image)
+    if linearly_independent: return make_linearly_independent(output)
+    else: return output
 
 if 'p' not in globals() or p == None: p=2591 # 2⁵×3⁴-1
 assert p%4==3 and p%3==2
@@ -1290,5 +1352,6 @@ H = num_iso_classes(p)
 ExE = SSpecPPAS(E)
 I2 = identity_matrix(B,2)
 ExE_22_kernels, ExE_22_matrices = get_all_ExE_kernels(2)
+BTB = BTB2_matrices()
 
 possible_rows_dict = dict()
